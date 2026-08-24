@@ -4,10 +4,12 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Brackets, SelectQueryBuilder } from 'typeorm';
+import { Repository, Brackets, IsNull, Not, SelectQueryBuilder } from 'typeorm';
 import { Project, ProjectStatus } from './entities/project.entity';
+import { Retirement } from '../credits/entities/retirement.entity';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { QueryProjectsDto, SortOrder } from './dto/query-projects.dto';
@@ -32,6 +34,8 @@ export class ProjectsService {
   constructor(
     @InjectRepository(Project)
     private readonly projectRepo: Repository<Project>,
+    @InjectRepository(Retirement)
+    private readonly retirementRepo: Repository<Retirement>,
   ) {}
 
   async create(ownerId: string, dto: CreateProjectDto): Promise<Project> {
@@ -186,7 +190,7 @@ export class ProjectsService {
     return this.projectRepo.count();
   }
 
-  async remove(id: string, userId: string, callerRole?: UserRole): Promise<void> {
+  async remove(id: string, userId: string, callerRole?: UserRole, force = false): Promise<void> {
     const project = await this.findById(id);
 
     const isAdmin = callerRole !== undefined && ADMIN_ROLES.includes(callerRole);
@@ -201,6 +205,27 @@ export class ProjectsService {
       );
     }
 
-    await this.projectRepo.remove(project);
+    // Guard: block deletion if the project has any confirmed on-chain retirements.
+    const confirmedRetirements = await this.retirementRepo.count({
+      where: { projectId: id, txHash: Not(IsNull()) },
+    });
+    if (confirmedRetirements > 0) {
+      throw new ConflictException(
+        'Cannot delete a project with confirmed retirements. Financial records must be retained.',
+      );
+    }
+
+    if (force && isAdmin) {
+      // Hard delete — only admins may force-delete a project with no financial records.
+      this.logger.warn(
+        `Force hard-delete: user ${userId} (role=${callerRole}) permanently deleted project ${id}`,
+      );
+      await this.projectRepo.remove(project);
+    } else {
+      // Soft delete — sets deletedAt and isActive = false.
+      project.isActive = false;
+      await this.projectRepo.save(project);
+      await this.projectRepo.softRemove(project);
+    }
   }
 }

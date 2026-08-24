@@ -9,6 +9,8 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  ParseBoolPipe,
+  DefaultValuePipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ProjectsService } from './projects.service';
@@ -78,12 +80,13 @@ export class ProjectsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Soft-delete a project' })
+  @ApiOperation({ summary: 'Soft-delete a project (admin may pass ?force=true for hard delete)' })
   async remove(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
     @CurrentUser('role') callerRole: UserRole,
+    @Query('force', new DefaultValuePipe(false), ParseBoolPipe) force: boolean,
   ): Promise<void> {
-    return this.projectsService.remove(id, userId, callerRole);
+    return this.projectsService.remove(id, userId, callerRole, force);
   }
 }
