@@ -43,7 +43,7 @@ import sensorConfig from './config/sensor.config';
         database: configService.get('database.database'),
         ssl: configService.get('database.ssl'),
         autoLoadEntities: true,
-        synchronize: configService.get('app.nodeEnv') !== 'production',
+        synchronize: false,
       }),
       inject: [ConfigService],
     }),

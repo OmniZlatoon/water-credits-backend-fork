@@ -57,6 +57,9 @@ jobs:
           node-version-file: .nvmrc
           cache: 'npm'
       - run: npm ci
+      - run: npm run migration:run
+        env:
+          DB_DATABASE: water_credits_test
       - run: npm test -- --coverage
       - run: npm run test:e2e
         env:

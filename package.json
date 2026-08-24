@@ -17,7 +17,9 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "script:seed": "npx ts-node -r tsconfig-paths/register src/scripts/seed.ts",
     "allowlist:add": "npx ts-node -r tsconfig-paths/register src/scripts/allowlist-add.ts",
-    "allowlist:revoke": "npx ts-node -r tsconfig-paths/register src/scripts/allowlist-revoke.ts"
+    "allowlist:revoke": "npx ts-node -r tsconfig-paths/register src/scripts/allowlist-revoke.ts",
+    "migration:run": "npx ts-node -r tsconfig-paths/register src/scripts/migration-runner.ts",
+    "migration:status": "npx ts-node -r tsconfig-paths/register src/scripts/migration-status.ts"
   },
   "dependencies": {
     "@nestjs/bull": "^10.0.0",
