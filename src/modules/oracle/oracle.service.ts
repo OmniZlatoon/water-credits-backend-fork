@@ -146,6 +146,7 @@ export class OracleService {
 
       const submission = queryRunner.manager.create(OracleSubmission, {
         projectId: dto.projectId,
+        batchId: dto.batchId ?? null,
         oracleAddress: dto.oracleAddress,
         nonce,
         txHash: '',
@@ -167,6 +168,7 @@ export class OracleService {
       {
         submissionId: saved.id,
         projectId: dto.projectId,
+        batchId: saved.batchId,
         oracleAddress: dto.oracleAddress,
         nonce: saved.nonce,
       },
@@ -270,11 +272,14 @@ export class OracleService {
   // ── Nonce-gap detection ─────────────────────────────────────────────────
 
   /**
-   * Logs a warning when the local max confirmed nonce diverges from the
-   * on-chain oracle nonce by more than 1 (indicating a missed or desynced
-   * submission).
+   * Compares the local max confirmed nonce against the on-chain oracle nonce
+   * and returns the signed drift (`onChain - local`).
+   *
+   * Returns `null` when the RPC call fails (error is swallowed so a
+   * transient network blip never blocks a submission cycle). Logs a warning
+   * when `|diff| > 1`.
    */
-  async detectNonceDrift(oracleContractId: string, oracleAddress: string): Promise<void> {
+  async detectNonceDrift(oracleContractId: string, oracleAddress: string): Promise<number | null> {
     const localMax = await this.submissionRepo.findOne({
       where: { oracleAddress, status: SubmissionStatus.CONFIRMED },
       order: { nonce: 'DESC' },
@@ -286,7 +291,7 @@ export class OracleService {
       onChainNonce = await this.stellarService.getOracleNonce(oracleContractId, oracleAddress);
     } catch {
       this.logger.warn(`detectNonceDrift: could not read on-chain nonce for ${oracleAddress}`);
-      return;
+      return null;
     }
 
     const diff = onChainNonce - localNonce;
@@ -296,6 +301,7 @@ export class OracleService {
           `local=${localNonce} on-chain=${onChainNonce} diff=${diff}`,
       );
     }
+    return diff;
   }
 
   /**
@@ -335,6 +341,33 @@ export class OracleService {
     return result.map((r) => r.oracleAddress).filter(Boolean);
   }
 
+  private async findSubmittedBatchForSubmission(
+    submission: OracleSubmission,
+  ): Promise<ReadingBatch | null> {
+    if (!submission.batchId) {
+      this.logger.warn(
+        `Oracle submission ${submission.id} has no batchId; skipping reconciliation batch credit update`,
+      );
+      return null;
+    }
+
+    const batch = await this.batchRepo.findOne({
+      where: {
+        id: submission.batchId,
+        projectId: submission.projectId,
+        status: BatchStatus.SUBMITTED,
+      },
+    });
+
+    if (!batch) {
+      this.logger.warn(
+        `Batch ${submission.batchId} for oracle submission ${submission.id} was not found in SUBMITTED status during reconciliation`,
+      );
+    }
+
+    return batch;
+  }
+
   async reconcile(oracleContractId: string, oracleAddress: string): Promise<void> {
     let onChainNonce: number;
     try {
@@ -369,6 +402,7 @@ export class OracleService {
           {
             submissionId: sub.id,
             projectId: sub.projectId,
+            batchId: sub.batchId,
             oracleAddress: sub.oracleAddress,
             nonce: sub.nonce,
           },
@@ -421,13 +455,7 @@ export class OracleService {
               Number(project.areaHectares),
             );
 
-            const batch = await this.batchRepo.findOne({
-              where: {
-                projectId: sub.projectId,
-                status: In([BatchStatus.PENDING, BatchStatus.SUBMITTED]),
-              },
-              order: { createdAt: 'DESC' },
-            });
+            const batch = await this.findSubmittedBatchForSubmission(sub);
 
             if (batch) {
               batch.status = BatchStatus.CONFIRMED;
