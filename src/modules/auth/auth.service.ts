@@ -237,7 +237,12 @@ export class AuthService {
   // ── Token generation ──────────────────────────────────────────────────────
 
   private async generateTokens(user: User): Promise<{ accessToken: string; refreshToken: string }> {
-    const payload = { sub: user.id, wallet: user.wallet, role: user.role };
+    const payload = {
+      sub: user.id,
+      wallet: user.wallet,
+      role: user.role,
+      jti: crypto.randomUUID(),
+    };
     const accessExpiresIn = this.configService.get<string>('jwt.expiration') ?? '7d';
     const refreshExpiresIn = this.configService.get<string>('jwt.refreshExpiration') ?? '30d';
     const secret = this.configService.get<string>('jwt.secret');
