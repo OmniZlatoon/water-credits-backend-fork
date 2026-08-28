@@ -64,6 +64,7 @@
     "@types/jest": "^29.5.14",
     "@types/multer": "^1.4.11",
     "@types/node": "^20.10.0",
+    "@types/nodemailer": "^8.0.1",
     "@types/passport-jwt": "^4.0.0",
     "@types/supertest": "^7.2.1",
     "@typescript-eslint/eslint-plugin": "^8.61.1",
@@ -92,7 +93,10 @@
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
+      "^.+\\.(t|j)s$": ["ts-jest", { "diagnostics": false }]
+    },
+    "moduleNameMapper": {
+      "^nodemailer$": "<rootDir>/../test/__mocks__/nodemailer.js"
     },
     "moduleNameMapper": {
       "^nodemailer$": "<rootDir>/../test/__mocks__/nodemailer.js"
