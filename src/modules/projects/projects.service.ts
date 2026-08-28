@@ -8,7 +8,6 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Brackets, IsNull, Not, SelectQueryBuilder } from 'typeorm';
-import { Repository, Brackets } from 'typeorm';
 import { Project, ProjectStatus } from './entities/project.entity';
 import { Retirement } from '../credits/entities/retirement.entity';
 import { CreateProjectDto } from './dto/create-project.dto';
