@@ -6,6 +6,8 @@ import { getQueueToken } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { createTestApp, runMigrations, truncateTables } from './setup';
 import { StellarClient } from '../src/modules/stellar/stellar.client';
+import { StellarService } from '../src/modules/stellar/stellar.service';
+import { BigNumber } from 'bignumber.js';
 
 describe('CreditsController (e2e)', () => {
   let app: INestApplication;
@@ -28,8 +30,13 @@ describe('CreditsController (e2e)', () => {
       getSimulationKeypair: jest.fn().mockReturnValue(Keypair.random()),
     };
 
+    const mockStellarService = {
+      getBalance: jest.fn().mockResolvedValue(new BigNumber(1000)),
+    };
+
     const testEnv = await createTestApp((builder) => {
       builder.overrideProvider(StellarClient).useValue(mockStellarClient);
+      builder.overrideProvider(StellarService).useValue(mockStellarService);
     });
     
     app = testEnv.app;
@@ -82,6 +89,10 @@ describe('CreditsController (e2e)', () => {
       .expect(201);
 
     projectId = projectRes.body.id;
+    await dataSource.query(
+      `UPDATE projects SET credit_token_address = $1 WHERE id = $2`,
+      ['test-token', projectId],
+    );
   });
 
   it('2. Call POST /credits/retire and assert job enqueued', async () => {
@@ -104,8 +115,8 @@ describe('CreditsController (e2e)', () => {
     // 1. Assert row created with empty txHash
     const retirements = await dataSource.query(`SELECT * FROM retirements WHERE id = $1`, [retirementId]);
     expect(retirements.length).toBe(1);
-    expect(retirements[0].amount).toBe('100'); // Check DB column type (string for numeric) or number
-    expect(retirements[0].tx_hash).toBeNull(); // Empty txHash
+    expect(Number(retirements[0].amount)).toBe(100);
+    expect(retirements[0].tx_hash ?? '').toBe('');
 
     // 2. Assert Bull job enqueued
     // Since worker might process it instantly, let's just check the job was added 
