@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { BullModule } from '@nestjs/bull';
 import { HealthController } from './health.controller';
 import { HealthService } from './health.service';
 import { StellarModule } from '../stellar/stellar.module';
@@ -15,6 +16,11 @@ import { AuthModule } from '../auth/auth.module';
   // store from the Bull/queue Redis instance checked below (#88).
   imports: [
     TypeOrmModule.forFeature([OracleScheduleState]),
+    BullModule.registerQueue(
+      { name: 'sensor-ingestion' },
+      { name: 'oracle-submit' },
+      { name: 'retirements' },
+    ),
     StellarModule,
     IndexerModule,
     AuthModule,
