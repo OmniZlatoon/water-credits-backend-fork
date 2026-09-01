@@ -18,7 +18,9 @@ export async function createMigrationDataSource(): Promise<DataSource> {
       process.env.DATABASE_SSL === 'true'
         ? {
             rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false',
-            ca: process.env.DATABASE_SSL_CA ? fs.readFileSync(process.env.DATABASE_SSL_CA) : undefined,
+            ca: process.env.DATABASE_SSL_CA
+              ? fs.readFileSync(process.env.DATABASE_SSL_CA)
+              : undefined,
           }
         : undefined,
   });
@@ -31,7 +33,7 @@ export async function runMigrations() {
   const dataSource = await createMigrationDataSource();
   const queryRunner = dataSource.createQueryRunner();
   await queryRunner.connect();
-  
+
   try {
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -47,27 +49,26 @@ export async function runMigrations() {
       return;
     }
 
-    const files = fs.readdirSync(migrationsDir).filter(f => f.endsWith('.sql')).sort();
-    
+    const files = fs
+      .readdirSync(migrationsDir)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
+
     let appliedCount = 0;
     for (const file of files) {
-      const existing = await queryRunner.query(
-        `SELECT id FROM schema_migrations WHERE name = $1`,
-        [file]
-      );
-      
+      const existing = await queryRunner.query(`SELECT id FROM schema_migrations WHERE name = $1`, [
+        file,
+      ]);
+
       if (existing.length === 0) {
         console.log(`Applying migration: ${file}`);
         const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
-        
+
         // Use a transaction per migration if possible, but some DDL might not support it
         await queryRunner.startTransaction();
         try {
           await queryRunner.query(sql);
-          await queryRunner.query(
-            `INSERT INTO schema_migrations (name) VALUES ($1)`,
-            [file]
-          );
+          await queryRunner.query(`INSERT INTO schema_migrations (name) VALUES ($1)`, [file]);
           await queryRunner.commitTransaction();
           appliedCount++;
           console.log(`✅ Applied: ${file}`);
@@ -78,7 +79,7 @@ export async function runMigrations() {
         }
       }
     }
-    
+
     if (appliedCount === 0) {
       console.log('No pending migrations to apply.');
     } else {
@@ -91,7 +92,7 @@ export async function runMigrations() {
 }
 
 if (require.main === module) {
-  runMigrations().catch(err => {
+  runMigrations().catch((err) => {
     console.error('Migration runner failed:', err);
     process.exit(1);
   });

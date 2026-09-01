@@ -64,7 +64,9 @@ async function run() {
 
   for (const batch of uncalculatedBatches) {
     const project = await projectRepo.findOne({ where: { id: batch.projectId } });
-    if (!project) continue;
+    if (!project) {
+      continue;
+    }
 
     const submission = await submissionRepo.findOne({
       where: {

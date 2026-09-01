@@ -80,15 +80,9 @@ describe('IndexerService', () => {
     };
 
     (cursorRepo.create as jest.Mock).mockImplementation((data) => data);
-    (cursorRepo.save as jest.Mock).mockImplementation((entity) =>
-      Promise.resolve(entity),
-    );
-    (submissionRepo.save as jest.Mock).mockImplementation((entity) =>
-      Promise.resolve(entity),
-    );
-    (proposalRepo.save as jest.Mock).mockImplementation((entity) =>
-      Promise.resolve(entity),
-    );
+    (cursorRepo.save as jest.Mock).mockImplementation((entity) => Promise.resolve(entity));
+    (submissionRepo.save as jest.Mock).mockImplementation((entity) => Promise.resolve(entity));
+    (proposalRepo.save as jest.Mock).mockImplementation((entity) => Promise.resolve(entity));
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -97,11 +91,21 @@ describe('IndexerService', () => {
           provide: ConfigService,
           useValue: {
             get: jest.fn((key: string, defaultVal?: unknown) => {
-              if (key === 'INDEXER_POLL_INTERVAL_MS') return 999_999; // huge — never fires in tests
-              if (key === 'CONTRACT_CREDIT_FACTORY') return 'CONTRACT1';
-              if (key === 'CONTRACT_VERIFICATION_ORACLE') return 'CONTRACT2';
-              if (key === 'CONTRACT_RETIREMENT_REGISTRY') return 'CONTRACT3';
-              if (key === 'stellar.contractGovernance') return 'CONTRACT4';
+              if (key === 'INDEXER_POLL_INTERVAL_MS') {
+                return 999_999;
+              } // huge — never fires in tests
+              if (key === 'CONTRACT_CREDIT_FACTORY') {
+                return 'CONTRACT1';
+              }
+              if (key === 'CONTRACT_VERIFICATION_ORACLE') {
+                return 'CONTRACT2';
+              }
+              if (key === 'CONTRACT_RETIREMENT_REGISTRY') {
+                return 'CONTRACT3';
+              }
+              if (key === 'stellar.contractGovernance') {
+                return 'CONTRACT4';
+              }
               return defaultVal;
             }),
           },
@@ -215,9 +219,7 @@ describe('IndexerService', () => {
 
       await (service as unknown as { doPoll: () => Promise<void> }).doPoll();
 
-      expect(debugSpy).toHaveBeenCalledWith(
-        expect.stringContaining('"context":"IndexerService"'),
-      );
+      expect(debugSpy).toHaveBeenCalledWith(expect.stringContaining('"context":"IndexerService"'));
     });
   });
 
@@ -227,7 +229,9 @@ describe('IndexerService', () => {
     it('applies a credit:mint event twice without double-writing credits', async () => {
       // Use processEvents directly with already-decoded events to bypass scValToNative.
       type ProcessEvents = (events: DecodedEvent[]) => Promise<void>;
-      const processEvents = (service as unknown as { processEvents: ProcessEvents }).processEvents.bind(service);
+      const processEvents = (
+        service as unknown as { processEvents: ProcessEvents }
+      ).processEvents.bind(service);
 
       const mintDecoded: DecodedEvent = {
         id: 'ev-mint-001',

@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleDestroy,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -134,8 +129,7 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
 
       const lastIndexedLedger = cursor?.lastIndexedLedger ?? null;
       const chainTipLedger = tip.sequence;
-      const lag =
-        lastIndexedLedger !== null ? chainTipLedger - lastIndexedLedger : null;
+      const lag = lastIndexedLedger !== null ? chainTipLedger - lastIndexedLedger : null;
 
       let status: 'ok' | 'behind' | 'stopped' = 'ok';
       if (this.pollHandle === null) {
@@ -170,10 +164,7 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
     try {
       await this.doPoll();
     } catch (err) {
-      this.logger.error(
-        `Poll cycle error: ${(err as Error).message}`,
-        (err as Error).stack,
-      );
+      this.logger.error(`Poll cycle error: ${(err as Error).message}`, (err as Error).stack);
     } finally {
       this.polling = false;
     }
@@ -201,9 +192,7 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
     // Cold start: begin from the ledger before the current tip.
     if (cursor.lastIndexedLedger === null) {
       const seedLedger = Math.max(chainTipLedger - 1, 0);
-      this.logger.log(
-        `IndexerService cold start — seeding cursor at ledger ${seedLedger}`,
-      );
+      this.logger.log(`IndexerService cold start — seeding cursor at ledger ${seedLedger}`);
       cursor.lastIndexedLedger = seedLedger;
       await this.cursorRepo.save(cursor);
       return; // First tick seeds only; actual events polled on next tick.
@@ -306,10 +295,7 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
       // advance to pageTo so we don't repeat this range on the next tick.
       let processedLedgerTo = pageTo;
       if (rpcEvents.length > 0) {
-        const maxLedger = rpcEvents.reduce(
-          (max, ev) => Math.max(max, ev.ledger),
-          0,
-        );
+        const maxLedger = rpcEvents.reduce((max, ev) => Math.max(max, ev.ledger), 0);
         // Only advance as far as we received events — the remainder of the
         // range will be picked up on the next poll.
         processedLedgerTo = Math.min(maxLedger, pageTo);
@@ -320,10 +306,18 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
         ledger: ev.ledger,
         contractId: String(ev.contractId ?? ''),
         topics: (ev.topic ?? []).map((t) => {
-          try { return scValToNative(t); } catch { return null; }
+          try {
+            return scValToNative(t);
+          } catch {
+            return null;
+          }
         }),
         value: (() => {
-          try { return scValToNative(ev.value); } catch { return null; }
+          try {
+            return scValToNative(ev.value);
+          } catch {
+            return null;
+          }
         })(),
       }));
 
@@ -331,9 +325,7 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
     } catch (err) {
       // A single-range failure must not abort the cursor advance — log and
       // treat this range as empty so we do not get stuck in an infinite loop.
-      this.logger.warn(
-        `getEvents(${fromLedger}→${pageTo}) failed: ${(err as Error).message}`,
-      );
+      this.logger.warn(`getEvents(${fromLedger}→${pageTo}) failed: ${(err as Error).message}`);
       return { events: [], processedLedgerTo: pageTo };
     }
   }
@@ -418,8 +410,7 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
       .set({
         status: BatchStatus.CONFIRMED,
         confirmedAt: () => `COALESCE(confirmed_at, NOW())`,
-        creditsGenerated: () =>
-          `COALESCE(credits_generated, ${amount})`,
+        creditsGenerated: () => `COALESCE(credits_generated, ${amount})`,
       })
       .where(
         `project_id IN (
@@ -568,9 +559,7 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
    * 'confirmed' pattern — if the oracle processor already confirmed this
    * submission the row is left untouched.
    */
-  private async onOracleReadingSubmitted(
-    event: OracleReadingSubmittedEvent,
-  ): Promise<void> {
+  private async onOracleReadingSubmitted(event: OracleReadingSubmittedEvent): Promise<void> {
     // Find the submission row by project/oracle/nonce.
     const submission = await this.submissionRepo.findOne({
       where: {
@@ -601,8 +590,7 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
           .set({
             status: BatchStatus.CONFIRMED,
             confirmedAt: () => `COALESCE(confirmed_at, NOW())`,
-            creditsGenerated: () =>
-              `COALESCE(credits_generated, ${Number(event.creditsAwarded)})`,
+            creditsGenerated: () => `COALESCE(credits_generated, ${Number(event.creditsAwarded)})`,
           })
           .where('project_id = :projectId', { projectId: event.projectId })
           .andWhere('status IN (:...statuses)', {
@@ -742,23 +730,23 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
   private resolveContractIds(): string[] {
     const ids: string[] = [];
 
-    const creditFactory = this.configService.get<string>(
-      'CONTRACT_CREDIT_FACTORY',
-    );
-    const oracle = this.configService.get<string>(
-      'CONTRACT_VERIFICATION_ORACLE',
-    );
-    const retirement = this.configService.get<string>(
-      'CONTRACT_RETIREMENT_REGISTRY',
-    );
-    const governance = this.configService.get<string>(
-      'stellar.contractGovernance',
-    );
+    const creditFactory = this.configService.get<string>('CONTRACT_CREDIT_FACTORY');
+    const oracle = this.configService.get<string>('CONTRACT_VERIFICATION_ORACLE');
+    const retirement = this.configService.get<string>('CONTRACT_RETIREMENT_REGISTRY');
+    const governance = this.configService.get<string>('stellar.contractGovernance');
 
-    if (creditFactory) ids.push(creditFactory);
-    if (oracle) ids.push(oracle);
-    if (retirement) ids.push(retirement);
-    if (governance) ids.push(governance);
+    if (creditFactory) {
+      ids.push(creditFactory);
+    }
+    if (oracle) {
+      ids.push(oracle);
+    }
+    if (retirement) {
+      ids.push(retirement);
+    }
+    if (governance) {
+      ids.push(governance);
+    }
 
     return ids;
   }
