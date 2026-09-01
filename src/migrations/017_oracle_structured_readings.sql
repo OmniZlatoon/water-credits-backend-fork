@@ -36,9 +36,8 @@
 -- mapSnapshotToPayload() already prevents empty payloads from reaching the DB.
 
 -- 1. Add a GIN index for fast JSONB parameter queries.
---    (CONCURRENTLY is safe here; it does not hold a full table lock.)
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_oracle_submissions_snapshot_gin
-    ON oracle_submissions USING gin (readings_snapshot);
+--    This must run outside any transaction block; the migration runner handles
+--    CREATE INDEX CONCURRENTLY separately to satisfy PostgreSQL requirements.
 
 -- 2. Add a CHECK constraint that rejects snapshots with no recognisable
 --    numeric reading fields.  The expression evaluates to TRUE when any of the

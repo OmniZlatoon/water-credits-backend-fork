@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
+import { Client } from 'pg';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
@@ -31,6 +32,25 @@ export async function createMigrationDataSource(): Promise<DataSource> {
 
 export function migrationRequiresNoTransaction(sql: string): boolean {
   return /CREATE\s+INDEX\s+CONCURRENTLY\b/i.test(sql);
+}
+
+function createPgClientConfig() {
+  return {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '5432', 10),
+    user: process.env.DB_USERNAME || 'postgres',
+    password: process.env.DB_PASSWORD || 'postgres',
+    database: process.env.DB_DATABASE || 'water_credits',
+    ssl:
+      process.env.DATABASE_SSL === 'true'
+        ? {
+            rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false',
+            ca: process.env.DATABASE_SSL_CA
+              ? fs.readFileSync(process.env.DATABASE_SSL_CA)
+              : undefined,
+          }
+        : undefined,
+  };
 }
 
 export async function runMigrations() {
@@ -70,14 +90,18 @@ export async function runMigrations() {
         const requiresNoTransaction = migrationRequiresNoTransaction(sql);
 
         if (requiresNoTransaction) {
+          const client = new Client(createPgClientConfig());
           try {
-            await queryRunner.query(sql);
-            await queryRunner.query(`INSERT INTO schema_migrations (name) VALUES ($1)`, [file]);
+            await client.connect();
+            await client.query(sql);
+            await client.query(`INSERT INTO schema_migrations (name) VALUES ($1)`, [file]);
             appliedCount++;
             console.log(`✅ Applied: ${file}`);
           } catch (error) {
             console.error(`❌ Failed to apply migration: ${file}`, error);
             throw error;
+          } finally {
+            await client.end();
           }
         } else {
           await queryRunner.startTransaction();
