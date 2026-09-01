@@ -30,6 +30,29 @@
 --     the schema the TypeORM entity @Index decorators generate in development
 --     (where synchronize is enabled).
 
+-- ── notifications — table + keyset index ────────────────────────────────────
+CREATE TYPE notification_type AS ENUM (
+    'sensor:reading',
+    'sensor:alert',
+    'credit:minted',
+    'credit:retired',
+    'oracle:status',
+    'oracle:submitted',
+    'governance:proposal',
+    'governance:vote'
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type notification_type NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    metadata JSONB,
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ── sensor_readings — keyset (timestamp, id), plus filtered variants ─────────
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_sensor_readings_timestamp_id
     ON sensor_readings (timestamp, id);

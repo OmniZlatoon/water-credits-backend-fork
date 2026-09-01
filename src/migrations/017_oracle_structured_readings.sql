@@ -35,11 +35,7 @@
 -- or INSERT — that is intentional: the application-level guard in
 -- mapSnapshotToPayload() already prevents empty payloads from reaching the DB.
 
--- 1. Add a GIN index for fast JSONB parameter queries.
---    This must run outside any transaction block; the migration runner handles
---    CREATE INDEX CONCURRENTLY separately to satisfy PostgreSQL requirements.
-
--- 2. Add a CHECK constraint that rejects snapshots with no recognisable
+-- 1. Add a CHECK constraint that rejects snapshots with no recognisable
 --    numeric reading fields.  The expression evaluates to TRUE when any of the
 --    seven canonical keys is present and not JSON null.
 ALTER TABLE oracle_submissions
@@ -54,7 +50,7 @@ ALTER TABLE oracle_submissions
         OR (readings_snapshot -> 'temperature')    IS NOT NULL AND (readings_snapshot ->> 'temperature')      IS NOT NULL
     );
 
--- 3. Document the expected JSONB schema on the table and column.
+-- 2. Document the expected JSONB schema on the table and column.
 COMMENT ON TABLE oracle_submissions IS
     'Off-chain record of every Soroban oracle submission.  '
     'readings_snapshot stores the full multi-parameter water-quality payload '
@@ -68,3 +64,8 @@ COMMENT ON COLUMN oracle_submissions.readings_snapshot IS
     'phosphorus (numeric, mg/L), temperature (numeric, °C).  '
     'Values are stored as plain numbers; the Soroban contract receives them '
     'as Option<i128> scaled by 1 000 (3 dp fixed-point).';
+
+-- 3. Add a GIN index for fast JSONB parameter queries.
+--    PostgreSQL requires this to run outside any transaction block.
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_oracle_submissions_snapshot_gin
+    ON oracle_submissions USING gin (readings_snapshot);
