@@ -29,6 +29,10 @@ export async function createMigrationDataSource(): Promise<DataSource> {
   return dataSource;
 }
 
+export function migrationRequiresNoTransaction(sql: string): boolean {
+  return /CREATE\s+INDEX\s+CONCURRENTLY\b/i.test(sql);
+}
+
 export async function runMigrations() {
   const dataSource = await createMigrationDataSource();
   const queryRunner = dataSource.createQueryRunner();
@@ -63,19 +67,31 @@ export async function runMigrations() {
       if (existing.length === 0) {
         console.log(`Applying migration: ${file}`);
         const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
+        const requiresNoTransaction = migrationRequiresNoTransaction(sql);
 
-        // Use a transaction per migration if possible, but some DDL might not support it
-        await queryRunner.startTransaction();
-        try {
-          await queryRunner.query(sql);
-          await queryRunner.query(`INSERT INTO schema_migrations (name) VALUES ($1)`, [file]);
-          await queryRunner.commitTransaction();
-          appliedCount++;
-          console.log(`✅ Applied: ${file}`);
-        } catch (error) {
-          await queryRunner.rollbackTransaction();
-          console.error(`❌ Failed to apply migration: ${file}`, error);
-          throw error;
+        if (requiresNoTransaction) {
+          try {
+            await queryRunner.query(sql);
+            await queryRunner.query(`INSERT INTO schema_migrations (name) VALUES ($1)`, [file]);
+            appliedCount++;
+            console.log(`✅ Applied: ${file}`);
+          } catch (error) {
+            console.error(`❌ Failed to apply migration: ${file}`, error);
+            throw error;
+          }
+        } else {
+          await queryRunner.startTransaction();
+          try {
+            await queryRunner.query(sql);
+            await queryRunner.query(`INSERT INTO schema_migrations (name) VALUES ($1)`, [file]);
+            await queryRunner.commitTransaction();
+            appliedCount++;
+            console.log(`✅ Applied: ${file}`);
+          } catch (error) {
+            await queryRunner.rollbackTransaction();
+            console.error(`❌ Failed to apply migration: ${file}`, error);
+            throw error;
+          }
         }
       }
     }
