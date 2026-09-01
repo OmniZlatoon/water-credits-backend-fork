@@ -1,4 +1,4 @@
-import { migrationRequiresNoTransaction } from './migration-runner';
+import { migrationRequiresNoTransaction, splitSqlStatements } from './migration-runner';
 
 describe('migrationRequiresNoTransaction', () => {
   it('detects CREATE INDEX CONCURRENTLY statements', () => {
@@ -17,5 +17,16 @@ describe('migrationRequiresNoTransaction', () => {
     `;
 
     expect(migrationRequiresNoTransaction(sql)).toBe(false);
+  });
+
+  it('splits a multi-statement concurrent index migration into individual queries', () => {
+    const sql = `
+      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_a ON table_a (id);
+      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_b ON table_b (id);
+      ALTER TABLE table_a ADD COLUMN foo text;
+    `;
+
+    expect(splitSqlStatements(sql)).toHaveLength(3);
+    expect(splitSqlStatements(sql)[0]).toContain('CREATE INDEX CONCURRENTLY');
   });
 });

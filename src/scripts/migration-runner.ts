@@ -34,6 +34,13 @@ export function migrationRequiresNoTransaction(sql: string): boolean {
   return /CREATE\s+INDEX\s+CONCURRENTLY\b/i.test(sql);
 }
 
+export function splitSqlStatements(sql: string): string[] {
+  return sql
+    .split(';')
+    .map((statement) => statement.replace(/--.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '').trim())
+    .filter((statement) => statement.length > 0);
+}
+
 function createPgClientConfig() {
   return {
     host: process.env.DB_HOST || 'localhost',
@@ -93,7 +100,9 @@ export async function runMigrations() {
           const client = new Client(createPgClientConfig());
           try {
             await client.connect();
-            await client.query(sql);
+            for (const statement of splitSqlStatements(sql)) {
+              await client.query(statement);
+            }
             await client.query(`INSERT INTO schema_migrations (name) VALUES ($1)`, [file]);
             appliedCount++;
             console.log(`✅ Applied: ${file}`);
