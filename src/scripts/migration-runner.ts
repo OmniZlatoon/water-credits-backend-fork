@@ -86,7 +86,9 @@ export function splitSqlStatements(sql: string): string[] {
     statements.push(finalStatement);
   }
 
-  return statements.filter((statement) => /\b(ALTER|CREATE|COMMENT|DROP|INSERT|UPDATE|DELETE|TRUNCATE|REINDEX|VACUUM)\b/i.test(statement));
+  return statements.filter((statement) =>
+    /\b(ALTER|CREATE|COMMENT|DROP|INSERT|UPDATE|DELETE|TRUNCATE|REINDEX|VACUUM)\b/i.test(statement),
+  );
 }
 
 function createPgClientConfig() {
