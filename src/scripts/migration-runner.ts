@@ -35,10 +35,58 @@ export function migrationRequiresNoTransaction(sql: string): boolean {
 }
 
 export function splitSqlStatements(sql: string): string[] {
-  return sql
-    .split(';')
-    .map((statement) => statement.replace(/--.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '').trim())
-    .filter((statement) => statement.length > 0);
+  const sanitized = sql
+    .replace(/--.*$/gm, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\r/g, '');
+
+  const statements: string[] = [];
+  let current = '';
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+
+  for (let i = 0; i < sanitized.length; i++) {
+    const char = sanitized[i];
+    const prev = sanitized[i - 1];
+
+    if (char === "'" && !inDoubleQuote) {
+      const next = sanitized[i + 1];
+      if (inSingleQuote && prev !== '\\') {
+        const escapedQuote = sanitized[i - 2] === '\\' && sanitized[i - 3] !== '\\';
+        if (!escapedQuote) {
+          inSingleQuote = false;
+        }
+      } else if (!inSingleQuote && next !== "'") {
+        inSingleQuote = true;
+      }
+    }
+
+    if (char === '"' && !inSingleQuote) {
+      if (inDoubleQuote && prev !== '\\') {
+        inDoubleQuote = false;
+      } else if (!inDoubleQuote) {
+        inDoubleQuote = true;
+      }
+    }
+
+    if (char === ';' && !inSingleQuote && !inDoubleQuote) {
+      const nextStatement = current.trim();
+      if (nextStatement.length > 0) {
+        statements.push(nextStatement);
+      }
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  const finalStatement = current.trim();
+  if (finalStatement.length > 0) {
+    statements.push(finalStatement);
+  }
+
+  return statements.filter((statement) => /\b(ALTER|CREATE|COMMENT|DROP|INSERT|UPDATE|DELETE|TRUNCATE|REINDEX|VACUUM)\b/i.test(statement));
 }
 
 function createPgClientConfig() {
