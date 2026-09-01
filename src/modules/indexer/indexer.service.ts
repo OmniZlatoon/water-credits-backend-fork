@@ -91,6 +91,10 @@ export class IndexerService implements OnModuleInit, OnModuleDestroy {
   // ── Lifecycle ──────────────────────────────────────────────────────────
 
   onModuleInit(): void {
+    if (process.env.E2E_IN_MEMORY === 'true') {
+      return;
+    }
+
     const intervalMs = this.configService.get<number>(
       'INDEXER_POLL_INTERVAL_MS',
       10_000,
