@@ -27,6 +27,8 @@ describe('ProjectsController', () => {
     baselineEndDate: null,
     createdAt: new Date(),
     updatedAt: new Date(),
+    deletedAt: null,
+    isActive: true,
   };
 
   beforeEach(async () => {
@@ -138,12 +140,12 @@ describe('ProjectsController', () => {
   });
 
   describe('remove', () => {
-    it('should call service.remove with id, userId and callerRole', async () => {
+    it('should call service.remove with id, userId, callerRole, and force=false by default', async () => {
       service.remove.mockResolvedValue(undefined);
 
-      const result = await controller.remove('proj-1', 'user-1', UserRole.FARMER);
+      const result = await controller.remove('proj-1', 'user-1', UserRole.FARMER, false);
 
-      expect(service.remove).toHaveBeenCalledWith('proj-1', 'user-1', UserRole.FARMER);
+      expect(service.remove).toHaveBeenCalledWith('proj-1', 'user-1', UserRole.FARMER, false);
       expect(result).toBeUndefined();
     });
   });
