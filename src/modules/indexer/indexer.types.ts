@@ -153,9 +153,13 @@ export function decodeEvent(raw: DecodedEvent): IndexedEvent | null {
         // value:  { amount: bigint }
         const to = asString(keyTopics[0]);
         const payload = asMap(raw.value);
-        if (!to || !payload) return null;
+        if (!to || !payload) {
+          return null;
+        }
         const amount = asBigInt(payload['amount']);
-        if (amount === null) return null;
+        if (amount === null) {
+          return null;
+        }
         return {
           kind: 'credit:mint',
           contractId: raw.contractId,
@@ -171,11 +175,15 @@ export function decodeEvent(raw: DecodedEvent): IndexedEvent | null {
         // value:  { amount: bigint, purpose: string, metadata_uri: string }
         const from = asString(keyTopics[0]);
         const payload = asMap(raw.value);
-        if (!from || !payload) return null;
+        if (!from || !payload) {
+          return null;
+        }
         const amount = asBigInt(payload['amount']);
         const purpose = asString(payload['purpose']) ?? '';
         const metadataUri = asString(payload['metadata_uri']) ?? '';
-        if (amount === null) return null;
+        if (amount === null) {
+          return null;
+        }
         return {
           kind: 'credit:retire',
           contractId: raw.contractId,
@@ -194,9 +202,13 @@ export function decodeEvent(raw: DecodedEvent): IndexedEvent | null {
         const from = asString(keyTopics[0]);
         const to = asString(keyTopics[1]);
         const payload = asMap(raw.value);
-        if (!from || !to || !payload) return null;
+        if (!from || !to || !payload) {
+          return null;
+        }
         const amount = asBigInt(payload['amount']);
-        if (amount === null) return null;
+        if (amount === null) {
+          return null;
+        }
         return {
           kind: 'credit:transfer',
           contractId: raw.contractId,
@@ -214,10 +226,14 @@ export function decodeEvent(raw: DecodedEvent): IndexedEvent | null {
         const projectId = asString(keyTopics[0]);
         const oracleAddress = asString(keyTopics[1]);
         const payload = asMap(raw.value);
-        if (!projectId || !oracleAddress || !payload) return null;
+        if (!projectId || !oracleAddress || !payload) {
+          return null;
+        }
         const nonce = asNumber(payload['nonce']);
         const creditsAwarded = asBigInt(payload['credits_awarded']) ?? 0n;
-        if (nonce === null) return null;
+        if (nonce === null) {
+          return null;
+        }
         return {
           kind: 'oracle:reading_submitted',
           contractId: raw.contractId,
@@ -235,7 +251,9 @@ export function decodeEvent(raw: DecodedEvent): IndexedEvent | null {
         // value:  { executed_by: string }
         const onChainProposalId = asNumber(keyTopics[0]);
         const payload = asMap(raw.value);
-        if (onChainProposalId === null || !payload) return null;
+        if (onChainProposalId === null || !payload) {
+          return null;
+        }
         const executedBy = asString(payload['executed_by']) ?? '';
         return {
           kind: 'governance:proposal_executed',
@@ -278,9 +296,15 @@ export function decodeEvent(raw: DecodedEvent): IndexedEvent | null {
 // ── Coercion helpers ──────────────────────────────────────────────────────
 
 function asString(v: unknown): string | null {
-  if (typeof v === 'string') return v;
+  if (typeof v === 'string') {
+    return v;
+  }
   // Stellar SDK sometimes decodes Address ScVals as objects with .toString()
-  if (v !== null && typeof v === 'object' && typeof (v as { toString(): string }).toString === 'function') {
+  if (
+    v !== null &&
+    typeof v === 'object' &&
+    typeof (v as { toString(): string }).toString === 'function'
+  ) {
     const s = (v as { toString(): string }).toString();
     return s === '[object Object]' ? null : s;
   }
@@ -295,10 +319,18 @@ function asMap(v: unknown): Record<string, unknown> | null {
 }
 
 function asBigInt(v: unknown): bigint | null {
-  if (typeof v === 'bigint') return v;
-  if (typeof v === 'number') return BigInt(Math.round(v));
+  if (typeof v === 'bigint') {
+    return v;
+  }
+  if (typeof v === 'number') {
+    return BigInt(Math.round(v));
+  }
   if (typeof v === 'string') {
-    try { return BigInt(v); } catch { return null; }
+    try {
+      return BigInt(v);
+    } catch {
+      return null;
+    }
   }
   return null;
 }
@@ -309,8 +341,12 @@ function asBoolean(v: unknown): boolean | null {
 }
 
 function asNumber(v: unknown): number | null {
-  if (typeof v === 'number') return v;
-  if (typeof v === 'bigint') return Number(v);
+  if (typeof v === 'number') {
+    return v;
+  }
+  if (typeof v === 'bigint') {
+    return Number(v);
+  }
   if (typeof v === 'string') {
     const n = Number(v);
     return isNaN(n) ? null : n;

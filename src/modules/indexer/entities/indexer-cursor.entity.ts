@@ -1,9 +1,4 @@
-import {
-  Entity,
-  PrimaryColumn,
-  Column,
-  UpdateDateColumn,
-} from 'typeorm';
+import { Entity, PrimaryColumn, Column, UpdateDateColumn } from 'typeorm';
 
 /**
  * The well-known cursor key used by the singleton indexer instance.

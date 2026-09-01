@@ -13,7 +13,7 @@ async function showStatus() {
     try {
       const records = await queryRunner.query(`SELECT name FROM schema_migrations ORDER BY id ASC`);
       applied = records.map((r: any) => r.name);
-    } catch (e) {
+    } catch {
       // Table might not exist yet
     }
 
@@ -23,8 +23,11 @@ async function showStatus() {
       return;
     }
 
-    const files = fs.readdirSync(migrationsDir).filter(f => f.endsWith('.sql')).sort();
-    
+    const files = fs
+      .readdirSync(migrationsDir)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
+
     console.log('\n--- Migration Status ---');
     for (const file of files) {
       if (applied.includes(file)) {
@@ -34,7 +37,6 @@ async function showStatus() {
       }
     }
     console.log('------------------------\n');
-
   } finally {
     await queryRunner.release();
     await dataSource.destroy();
@@ -42,7 +44,7 @@ async function showStatus() {
 }
 
 if (require.main === module) {
-  showStatus().catch(err => {
+  showStatus().catch((err) => {
     console.error('Failed to get migration status:', err);
     process.exit(1);
   });

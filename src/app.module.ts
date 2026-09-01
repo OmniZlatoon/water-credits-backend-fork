@@ -55,7 +55,7 @@ import ipfsConfig from './config/ipfs.config';
         database: configService.get('database.database'),
         ssl: configService.get('database.ssl'),
         autoLoadEntities: true,
-  synchronize: configService.get('app.nodeEnv') === 'test',
+        synchronize: configService.get('app.nodeEnv') === 'test',
         retryAttempts: configService.get('app.nodeEnv') === 'test' ? 1 : 10,
         retryDelay: configService.get('app.nodeEnv') === 'test' ? 0 : 3000,
       }),
