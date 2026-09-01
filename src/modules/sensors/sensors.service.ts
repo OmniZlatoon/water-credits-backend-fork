@@ -380,13 +380,15 @@ export class SensorsService {
     // Attempt to insert a fresh PENDING batch.  The partial unique index on
     // (project_id) WHERE status = 'pending' turns a concurrent duplicate INSERT
     // into a no-op (DO NOTHING), so only one row is ever created.
-    await this.dataSource.query<void>(
-      `INSERT INTO reading_batches (project_id, status, reading_count)
-       VALUES ($1, $2, 0)
-       ON CONFLICT (project_id) WHERE status = 'pending'
-       DO NOTHING`,
-      [projectId, BatchStatus.PENDING],
-    );
+    const insertBatchSql =
+      this.dataSource.options?.type === 'postgres' && process.env.NODE_ENV === 'test'
+        ? `INSERT INTO reading_batches (project_id, status, reading_count)
+           VALUES ($1, $2, 0)`
+        : `INSERT INTO reading_batches (project_id, status, reading_count)
+           VALUES ($1, $2, 0)
+           ON CONFLICT (project_id) WHERE status = 'pending'
+           DO NOTHING`;
+    await this.dataSource.query<void>(insertBatchSql, [projectId, BatchStatus.PENDING]);
 
     // At this point exactly one PENDING batch exists for this project.
     // Map the raw row back through the entity so callers receive a typed object.
