@@ -7,7 +7,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Brackets, IsNull, Not, SelectQueryBuilder } from 'typeorm';
+import { Repository, Brackets, IsNull, Not } from 'typeorm';
 import { Project, ProjectStatus } from './entities/project.entity';
 import { Retirement } from '../credits/entities/retirement.entity';
 import { CreateProjectDto } from './dto/create-project.dto';
@@ -195,8 +195,7 @@ export class ProjectsService {
       longitude: 'longitude',
     };
 
-    const sqlColumn =
-      sortBy !== undefined && sortBy in SORT_COLUMN_MAP ? sortBy : 'created_at';
+    const sqlColumn = sortBy !== undefined && sortBy in SORT_COLUMN_MAP ? sortBy : 'created_at';
     const sortProperty = SORT_COLUMN_MAP[sqlColumn];
     const direction: SortDirection = sortOrder === SortOrder.ASC ? 'ASC' : 'DESC';
 
