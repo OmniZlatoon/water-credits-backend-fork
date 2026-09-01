@@ -1,8 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ProjectsService } from './projects.service';
 import { Project, ProjectStatus } from './entities/project.entity';
+import { Retirement } from '../credits/entities/retirement.entity';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { QueryProjectsDto, SortOrder } from './dto/query-projects.dto';
@@ -30,6 +36,8 @@ function makeProject(overrides: Partial<Project> = {}): Project {
     owner: null as never,
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
+    deletedAt: null,
+    isActive: true,
     ...overrides,
   } as Project;
 }
@@ -42,6 +50,7 @@ type MockRepo = {
   createQueryBuilder: jest.Mock;
   count: jest.Mock;
   remove: jest.Mock;
+  softRemove: jest.Mock;
 };
 
 function makeMockRepo(): MockRepo {
@@ -53,6 +62,7 @@ function makeMockRepo(): MockRepo {
     createQueryBuilder: jest.fn(),
     count: jest.fn(),
     remove: jest.fn(),
+    softRemove: jest.fn(),
   };
 }
 
@@ -74,12 +84,18 @@ function makeQueryBuilder(overrides: Partial<Record<string, jest.Mock>> = {}) {
 describe('ProjectsService', () => {
   let service: ProjectsService;
   let projectRepo: MockRepo;
+  let retirementRepo: { count: jest.Mock };
 
   beforeEach(async () => {
     projectRepo = makeMockRepo();
+    retirementRepo = { count: jest.fn().mockResolvedValue(0) };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [ProjectsService, { provide: getRepositoryToken(Project), useValue: projectRepo }],
+      providers: [
+        ProjectsService,
+        { provide: getRepositoryToken(Project), useValue: projectRepo },
+        { provide: getRepositoryToken(Retirement), useValue: retirementRepo },
+      ],
     }).compile();
 
     service = module.get<ProjectsService>(ProjectsService);
@@ -656,20 +672,39 @@ describe('ProjectsService', () => {
   // ── remove ───────────────────────────────────────────────────────────────
 
   describe('remove', () => {
-    it('deletes the project when user is the owner', async () => {
+    it('soft-deletes the project when user is the owner and no confirmed retirements', async () => {
       const project = makeProject();
       projectRepo.findOne.mockResolvedValue(project);
-      projectRepo.remove.mockResolvedValue(undefined);
+      projectRepo.save.mockResolvedValue(project);
+      projectRepo.softRemove.mockResolvedValue(undefined);
+      retirementRepo.count.mockResolvedValue(0);
 
       await service.remove('proj-uuid-1', 'user-uuid-1', UserRole.FARMER);
 
-      expect(projectRepo.findOne).toHaveBeenCalledWith({ where: { id: 'proj-uuid-1' } });
-      expect(projectRepo.remove).toHaveBeenCalledWith(project);
+      expect(projectRepo.softRemove).toHaveBeenCalledWith(expect.objectContaining({ id: 'proj-uuid-1', isActive: false }));
+      expect(projectRepo.remove).not.toHaveBeenCalled();
+    });
+
+    it('throws ConflictException when project has confirmed retirements', async () => {
+      const project = makeProject();
+      projectRepo.findOne.mockResolvedValue(project);
+      retirementRepo.count.mockResolvedValue(2); // 2 confirmed retirements
+
+      await expect(
+        service.remove('proj-uuid-1', 'user-uuid-1', UserRole.FARMER),
+      ).rejects.toThrow(ConflictException);
+      await expect(
+        service.remove('proj-uuid-1', 'user-uuid-1', UserRole.FARMER),
+      ).rejects.toThrow('Cannot delete a project with confirmed retirements');
+
+      expect(projectRepo.remove).not.toHaveBeenCalled();
+      expect(projectRepo.softRemove).not.toHaveBeenCalled();
     });
 
     it('throws ForbiddenException when a non-admin caller is not the owner', async () => {
       const project = makeProject({ ownerId: 'other-user' });
       projectRepo.findOne.mockResolvedValue(project);
+      retirementRepo.count.mockResolvedValue(0);
 
       await expect(
         service.remove('proj-uuid-1', 'different-user', UserRole.FARMER),
@@ -680,32 +715,29 @@ describe('ProjectsService', () => {
       expect(projectRepo.remove).not.toHaveBeenCalled();
     });
 
-    it('allows an admin to delete a project they do not own (ownership bypass)', async () => {
+    it('admin can soft-delete a project they do not own', async () => {
       const project = makeProject({ ownerId: 'other-user' });
       projectRepo.findOne.mockResolvedValue(project);
-      projectRepo.remove.mockResolvedValue(undefined);
+      projectRepo.save.mockResolvedValue(project);
+      projectRepo.softRemove.mockResolvedValue(undefined);
+      retirementRepo.count.mockResolvedValue(0);
 
       await service.remove('proj-uuid-1', 'admin-user', UserRole.ADMIN);
 
-      expect(projectRepo.remove).toHaveBeenCalledWith(project);
+      expect(projectRepo.softRemove).toHaveBeenCalled();
+      expect(projectRepo.remove).not.toHaveBeenCalled();
     });
 
-    it('allows a super admin to delete a project they do not own', async () => {
-      const project = makeProject({ ownerId: 'other-user' });
+    it('admin can force hard-delete a project with no confirmed retirements', async () => {
+      const project = makeProject({ ownerId: 'admin-user' });
       projectRepo.findOne.mockResolvedValue(project);
       projectRepo.remove.mockResolvedValue(undefined);
+      retirementRepo.count.mockResolvedValue(0);
 
-      await service.remove('proj-uuid-1', 'super-admin-user', UserRole.SUPER_ADMIN);
+      await service.remove('proj-uuid-1', 'admin-user', UserRole.ADMIN, true);
 
       expect(projectRepo.remove).toHaveBeenCalledWith(project);
-    });
-
-    it('still enforces ownership for an admin who is not privileged via role param absence', async () => {
-      const project = makeProject({ ownerId: 'other-user' });
-      projectRepo.findOne.mockResolvedValue(project);
-
-      await expect(service.remove('proj-uuid-1', 'some-user')).rejects.toThrow(ForbiddenException);
-      expect(projectRepo.remove).not.toHaveBeenCalled();
+      expect(projectRepo.softRemove).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException when project does not exist', async () => {
